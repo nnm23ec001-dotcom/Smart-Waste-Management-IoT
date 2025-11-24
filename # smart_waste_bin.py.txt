@@ -1,141 +1,154 @@
-# smart_waste_bin.py
-# MicroPython program for Raspberry Pi Pico / Pico W
-
 from machine import Pin, I2C, ADC, PWM
 import time
 import dht
+import framebuf
 import ssd1306
 import network
 import urequests
 
-# -------- CONFIG (replace with your credentials) --------
-WIFI_SSID = "YOUR_SSID"
-WIFI_PASSWORD = "YOUR_PASSWORD"
-THINGSPEAK_API_KEY = "YOUR_THINGSPEAK_KEY"
+#Telegram
+TOKEN = "8544681172:AAH0lpM4_7njrUXCshYC7pM0tMTPQCksx9A"
+CHAT_ID = "6382177750"
+MESSAGE1 = "🚨 Bin Full!"
+
+#Wi-Fi credentials
+ssid = "vivo"
+password = ""
+
+#Connect to Wi-Fi
+wlan = network.WLAN(network.STA_IF)
+wlan.active(True)
+wlan.connect(ssid, password)
+
+#check connectivity of wifi
+while not wlan.isconnected():
+    print("Connecting to WiFi...")
+    time.sleep(1)
+print("Connected:", wlan.ifconfig())
+
+#ThingSpeak setup
+THINGSPEAK_API_KEY = "4GHO8XQC1ON0GTTU"
 THINGSPEAK_URL = "https://api.thingspeak.com/update"
-TELEGRAM_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-TELEGRAM_CHAT_ID = "YOUR_CHAT_ID"
 
-# Thresholds
-BIN_HEIGHT_CM = 30        # physical bin height in cm
-BIN_FULL_THRESHOLD_CM = 5 # distance from ultrasonic to trash when "full"
-TEMP_ALERT_C = 32         # temperature threshold (C) to raise alert
-GAS_ALERT_PERCENT = 60.0  # MQ2 rough percentage threshold
-TELEGRAM_ALERT_COOLDOWN = 60 * 60  # seconds between telegram alerts
-
-# -------- PERIPHERALS --------
+# --- Ultrasonic Sensor ---
 TRIG_PIN = Pin(2, Pin.OUT)
 ECHO_PIN = Pin(3, Pin.IN)
+BIN_HEIGHT = 30 # cm
 
+# --- DHT22 Sensor ---
 dht_sensor = dht.DHT22(Pin(4))
 
+# --- Servo Motor ---
 servo = PWM(Pin(5))
 servo.freq(50)
 
+# --- Output Modules ---
 BUZZER = Pin(6, Pin.OUT)
 LED_GREEN = Pin(7, Pin.OUT)
 LED_RED = Pin(8, Pin.OUT)
 
-mq2_analog = ADC(26)
+# --- MQ2 Gas Sensor ---
+mq2_analog = ADC(26) # GP26 / ADC0
 
-# I2C for OLED (GP0 = SDA, GP1 = SCL)
+# --- OLED Display (I2C) ---
 i2c = I2C(0, sda=Pin(0), scl=Pin(1), freq=400000)
-try:
-    oled = ssd1306.SSD1306_I2C(128, 32, i2c)
-except Exception as e:
-    oled = None
-    print("OLED init failed:", e)
-
-# -------- Helpers --------
-
-def connect_wifi(ssid, password, timeout=15):
-    wlan = network.WLAN(network.STA_IF)
-    wlan.active(True)
-    if not wlan.isconnected():
-        wlan.connect(ssid, password)
-    start = time.time()
-    while not wlan.isconnected():
-        if time.time() - start > timeout:
-            return False
-        time.sleep(1)
-    return True
-
+oled= ssd1306.SSD1306_I2C(128,32,i2c)
 
 def get_distance_cm():
+    """Reads HC-SR04 Ultrasonic Sensor"""
+    # Trigger Pulse (10us)
     TRIG_PIN.low()
     time.sleep_us(2)
     TRIG_PIN.high()
     time.sleep_us(10)
     TRIG_PIN.low()
-
+    # Wait for Echo Start
     timeout = time.ticks_us()
     while ECHO_PIN.value() == 0:
-        if time.ticks_diff(time.ticks_us(), timeout) > 30000:
-            return BIN_HEIGHT_CM
+        if time.ticks_diff(time.ticks_us(), timeout) > 20000: return BIN_HEIGHT # Timeout
+    
     t1 = time.ticks_us()
-
+    
+    # Wait for Echo End
     timeout = time.ticks_us()
     while ECHO_PIN.value() == 1:
-        if time.ticks_diff(time.ticks_us(), timeout) > 30000:
-            return BIN_HEIGHT_CM
+        if time.ticks_diff(time.ticks_us(), timeout) > 20000: return BIN_HEIGHT # Timeout
     t2 = time.ticks_us()
-
+    
+    # Calculate distance (Sound speed = 343m/s or 0.0343 cm/us)
     duration = time.ticks_diff(t2, t1)
     distance = (duration * 0.0343) / 2
     return round(distance, 1)
 
-
-def set_servo_angle(angle_deg):
-    # Convert angle (0-180) to duty_u16 for 50Hz
-    # Typical pulse: 0.5ms (0deg) to 2.5ms (180deg) at 20ms period
-    min_pulse = 0.5
-    max_pulse = 2.5
-    pulse_ms = min_pulse + (angle_deg / 180.0) * (max_pulse - min_pulse)
-    duty_frac = pulse_ms / 20.0
-    duty_u16 = int(duty_frac * 65535)
-    servo.duty_u16(duty_u16)
-
+def move_servo(position):
+    """Controls SG90 Servo"""
+    if position == "OPEN":
+        servo.duty_u16(4800) # Locked
+    else:
+        servo.duty_u16(1600) # Open
 
 def get_gas_percentage():
-    raw_val = mq2_analog.read_u16()
+    """Reads MQ2 Analog value and converts to rough %"""
+    raw_val = mq2_analog.read_u16() # 0 - 65535
     percent = (raw_val / 65535) * 100
     return round(percent, 1)
 
-
-# -------- Main --------
-
-def main():
-    print("Connecting to Wi-Fi...")
-    if not connect_wifi(WIFI_SSID, WIFI_PASSWORD):
-        print("Wi-Fi connection failed; continuing in offline mode.")
-
-    last_telegram = 0
-
-    # default servo open (0 deg)
-    set_servo_angle(0)
-
-    while True:
+while True:
+    # SENSOR READINGS 
+    dist = get_distance_cm()
+    gas_pct = get_gas_percentage()
+    oled.fill(0)
+    oled.text("Bin Monitoring", 0, 0)
+    oled.show()
+    Bin_Full = 0
+    BUZZER.on()
+    LED_RED.off()
+    LED_GREEN.on()
+    temp = 0
+    dht_sensor.measure()
+    temp = dht_sensor.temperature()
+    hum = dht_sensor.humidity() 
+    #Cond1
+    if dist < 5:
+        Bin_Full = 1
+        move_servo("CLOSE")
+        BUZZER.off()
+        oled.fill(0)
+        oled.text("Bin Monitoring", 0, 0)
+        oled.text("Bin Full", 0, 8)
+        oled.show()
+    else :
+        move_servo("OPEN")
+    #Cond2
+    if temp > 32:
+        LED_RED.on()
+        LED_GREEN.off()
+        BUZZER.off()
+        oled.fill(0)
+        oled.text("Bin Monitoring", 0, 0)
+        oled.text("Hot", 0, 16)
+        oled.show()
+    # --- D. SERIAL DEBUG ---
+    print(f"D:{dist}cm | T:{temp}C | G:{gas_pct}% | Full:{Bin_Full}")
+    #Send data to thingspeak
+    try:
+        response = urequests.get(
+            f"{THINGSPEAK_URL}?api_key={THINGSPEAK_API_KEY}"
+            f"&field1={dist}&field2={temp}&field3={hum}&field4={gas_pct}"
+        )
+        print("Data sent:", response.status_code)
+        response.close()
+    except:
+        print("Failed to send data to Thingspeak")
+    
+    if dist < 5:
         try:
-            dist = get_distance_cm()
-        except Exception as e:
-            print("Ultrasonic read error:", e)
-            dist = BIN_HEIGHT_CM
-
-        try:
-            dht_sensor.measure()
-            temp = dht_sensor.temperature()
-            hum = dht_sensor.humidity()
-        except Exception as e:
-            print("DHT read error:", e)
-            temp = None
-            hum = None
-
-        gas_pct = get_gas_percentage()
-
-        # Status lights and buzzer
-        is_full = dist <= BIN_FULL_THRESHOLD_CM
-        if is_full:
-            LED_RED.on(); LED_GREEN.off(); BUZZER.on()
-            set_servo_angle(90)  # close lid position (adjust mechanically)
-        else:
-            LED_RED.off(); LE
+            response = urequests.get(
+                f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&text={MESSAGE1}"
+            )
+            print("Telegram alert sent")
+            response.close()
+        except:
+            print("Failed to send Telegram alert")
+            
+    time.sleep(1)
