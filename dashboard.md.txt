@@ -1,0 +1,13 @@
+**ThingSpeak dashboard**
+- Create a new ThingSpeak channel.
+- Fields recommended: `field1`=distance_cm, `field2`=temperature_C, `field3`=humidity_pct, `field4`=gas_pct
+- Use ThingSpeak built-in charts for each field and a combined view.
+
+**Recommended analytics**
+- Daily fill-level trend per bin (to spot peak hours)
+- Average gas levels (safety monitoring)
+- Alerts table (when bin full, timestamp)
+
+**Screenshots**
+https://drive.google.com/file/d/10xSnYaBNjmetUFy7P-P2MnXpeX3HWezG/view?usp=drive_link
+

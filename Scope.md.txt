@@ -1,0 +1,14 @@
+**Scope of the solution**
+
+In scope:
+- Real-time fill-level monitoring (ultrasonic sensor)
+- Environmental sensing (temperature, humidity, gas concentration)
+- Local visual feedback (OLED, LEDs) and audio (buzzer)
+- Remote alerts (Telegram) and cloud logging (ThingSpeak)
+- Simple servo-actuated lid mechanism
+- Documentation for hardware, software, and deployment
+
+Out of scope:
+- Full fleet management mobile app (this project provides data and a dashboard)
+- Advanced ML analytics (basic visualization only)
+- Rugged industrial enclosures (recommendations provided)

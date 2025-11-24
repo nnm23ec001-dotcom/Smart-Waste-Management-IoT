@@ -1,0 +1,25 @@
+**Hardware**
+- Raspberry Pi Pico (RP2040) or Pico W (if using native Wi-Fi). For standard Pico use an external ESP8266/ESP32 or use a Pico W instead.
+- HC-SR04 Ultrasonic sensor (distance)
+- DHT22 Temperature & Humidity sensor
+- MQ2 Gas sensor (analog)
+- SSD1306 128x32 I2C OLED display
+- SG90 Servo motor (lid)
+- Buzzer, Red & Green LEDs
+- Breadboard, jumper wires, external 5V supply (if needed)
+
+**Software / IDE**
+- Thonny IDE (recommended) — for uploading MicroPython code to the Pico.
+- MicroPython firmware for Raspberry Pi Pico.
+- ThingSpeak account for data logging and basic analytics.
+- Telegram bot (for alerts).
+
+**Libraries used (MicroPython)**
+- `machine` (Pin, I2C, ADC, PWM)
+- `time`, `network`, `urequests` (HTTP calls)
+- `dht`, `ssd1306` (display)
+
+**Credentials/Accounts required**
+- ThingSpeak API key
+- Telegram Bot token and chat id
+- Wi‑Fi SSID & password

@@ -1,0 +1,141 @@
+# smart_waste_bin.py
+# MicroPython program for Raspberry Pi Pico / Pico W
+
+from machine import Pin, I2C, ADC, PWM
+import time
+import dht
+import ssd1306
+import network
+import urequests
+
+# -------- CONFIG (replace with your credentials) --------
+WIFI_SSID = "YOUR_SSID"
+WIFI_PASSWORD = "YOUR_PASSWORD"
+THINGSPEAK_API_KEY = "YOUR_THINGSPEAK_KEY"
+THINGSPEAK_URL = "https://api.thingspeak.com/update"
+TELEGRAM_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+TELEGRAM_CHAT_ID = "YOUR_CHAT_ID"
+
+# Thresholds
+BIN_HEIGHT_CM = 30        # physical bin height in cm
+BIN_FULL_THRESHOLD_CM = 5 # distance from ultrasonic to trash when "full"
+TEMP_ALERT_C = 32         # temperature threshold (C) to raise alert
+GAS_ALERT_PERCENT = 60.0  # MQ2 rough percentage threshold
+TELEGRAM_ALERT_COOLDOWN = 60 * 60  # seconds between telegram alerts
+
+# -------- PERIPHERALS --------
+TRIG_PIN = Pin(2, Pin.OUT)
+ECHO_PIN = Pin(3, Pin.IN)
+
+dht_sensor = dht.DHT22(Pin(4))
+
+servo = PWM(Pin(5))
+servo.freq(50)
+
+BUZZER = Pin(6, Pin.OUT)
+LED_GREEN = Pin(7, Pin.OUT)
+LED_RED = Pin(8, Pin.OUT)
+
+mq2_analog = ADC(26)
+
+# I2C for OLED (GP0 = SDA, GP1 = SCL)
+i2c = I2C(0, sda=Pin(0), scl=Pin(1), freq=400000)
+try:
+    oled = ssd1306.SSD1306_I2C(128, 32, i2c)
+except Exception as e:
+    oled = None
+    print("OLED init failed:", e)
+
+# -------- Helpers --------
+
+def connect_wifi(ssid, password, timeout=15):
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+    if not wlan.isconnected():
+        wlan.connect(ssid, password)
+    start = time.time()
+    while not wlan.isconnected():
+        if time.time() - start > timeout:
+            return False
+        time.sleep(1)
+    return True
+
+
+def get_distance_cm():
+    TRIG_PIN.low()
+    time.sleep_us(2)
+    TRIG_PIN.high()
+    time.sleep_us(10)
+    TRIG_PIN.low()
+
+    timeout = time.ticks_us()
+    while ECHO_PIN.value() == 0:
+        if time.ticks_diff(time.ticks_us(), timeout) > 30000:
+            return BIN_HEIGHT_CM
+    t1 = time.ticks_us()
+
+    timeout = time.ticks_us()
+    while ECHO_PIN.value() == 1:
+        if time.ticks_diff(time.ticks_us(), timeout) > 30000:
+            return BIN_HEIGHT_CM
+    t2 = time.ticks_us()
+
+    duration = time.ticks_diff(t2, t1)
+    distance = (duration * 0.0343) / 2
+    return round(distance, 1)
+
+
+def set_servo_angle(angle_deg):
+    # Convert angle (0-180) to duty_u16 for 50Hz
+    # Typical pulse: 0.5ms (0deg) to 2.5ms (180deg) at 20ms period
+    min_pulse = 0.5
+    max_pulse = 2.5
+    pulse_ms = min_pulse + (angle_deg / 180.0) * (max_pulse - min_pulse)
+    duty_frac = pulse_ms / 20.0
+    duty_u16 = int(duty_frac * 65535)
+    servo.duty_u16(duty_u16)
+
+
+def get_gas_percentage():
+    raw_val = mq2_analog.read_u16()
+    percent = (raw_val / 65535) * 100
+    return round(percent, 1)
+
+
+# -------- Main --------
+
+def main():
+    print("Connecting to Wi-Fi...")
+    if not connect_wifi(WIFI_SSID, WIFI_PASSWORD):
+        print("Wi-Fi connection failed; continuing in offline mode.")
+
+    last_telegram = 0
+
+    # default servo open (0 deg)
+    set_servo_angle(0)
+
+    while True:
+        try:
+            dist = get_distance_cm()
+        except Exception as e:
+            print("Ultrasonic read error:", e)
+            dist = BIN_HEIGHT_CM
+
+        try:
+            dht_sensor.measure()
+            temp = dht_sensor.temperature()
+            hum = dht_sensor.humidity()
+        except Exception as e:
+            print("DHT read error:", e)
+            temp = None
+            hum = None
+
+        gas_pct = get_gas_percentage()
+
+        # Status lights and buzzer
+        is_full = dist <= BIN_FULL_THRESHOLD_CM
+        if is_full:
+            LED_RED.on(); LED_GREEN.off(); BUZZER.on()
+            set_servo_angle(90)  # close lid position (adjust mechanically)
+        else:
+            LED_RED.off(); LE

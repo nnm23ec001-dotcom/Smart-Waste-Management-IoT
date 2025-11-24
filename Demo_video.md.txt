@@ -1,0 +1,10 @@
+**Demo video guidance**
+Record a 2–4 minute video showing:
+1. Hardware setup and wiring
+2. Powering the Pico and connecting to Wi‑Fi
+3. Live OLED reading and LED/buzzer when bin is full
+4. ThingSpeak dashboard updating in real-time
+5. Telegram alert on your phone or Telegram web
+
+**Upload**
+https://drive.google.com/file/d/1KxEcfkKt1KaaCguvIs500KehbIhl8Bp6/view?usp=drivesdk

@@ -1,0 +1,17 @@
+**High-level wiring**
+
+- HC-SR04 TRIG -> Pico GP2
+- HC-SR04 ECHO -> Pico GP3 (use a 1k/2k divider for 5V->3.3V if needed)
+- DHT22 data -> Pico GP4 (with pull-up resistor)
+- MQ2 analog -> Pico ADC0 (GP26)
+- SSD1306 SCL -> GP1, SDA -> GP0 (I2C)
+- SG90 Servo -> GP5 (PWM) ; servo Vcc to 5V, GND common
+- Buzzer -> GP6
+- LED_GREEN -> GP7
+- LED_RED -> GP8
+
+**Notes**
+- If using a standard Raspberry Pi Pico (no native Wi-Fi) you will need an external Wi‑Fi module (ESP8266/ESP32) or switch to a Pico W. The code in repo is written for MicroPython running on Pico/Pico W; if using plain Pico, modify networking accordingly.
+- Place a small RC filter or smoothing on analog MQ2 supply if readings are noisy.
+
+https://drive.google.com/file/d/1UzNpSMzLYacp4dh55r-gHAlhSlfniliz/view?usp=sharing

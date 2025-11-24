@@ -1,0 +1,4 @@
+**Problem statement**
+Cities and communities face inefficient waste collection because bins are emptied on fixed schedules rather than actual need. This causes unnecessary collection trips, overflowing bins, hygiene risks and higher operational costs.
+
+**Goal:** Design an IoT-enabled smart waste management system that detects bin fill-level and environmental conditions in real-time, alerts authorities when bins need servicing, provides cloud analytics for route optimization, and supports low-cost, practical deployment in urban/community settings.

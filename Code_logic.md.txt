@@ -1,0 +1,12 @@
+**Code logic summary**
+
+1. Connect to Wi-Fi and verify connectivity.
+2. Read sensors periodically:
+   - Ultrasonic for distance -> compute fill level
+   - DHT22 for temperature & humidity
+   - MQ2 for gas level (analog)
+3. Update local OLED display and LEDs / buzzer based on thresholds.
+4. Send sensor readings to ThingSpeak for plotting (fields: distance, temp, hum, gas).
+5. If bin is full (distance threshold), send Telegram alert (one shot, with rate limiting).
+6. Control servo: keep lid open normally, close when bin is full (optional safety logic).
+7. Retry network operations with exception handling.
