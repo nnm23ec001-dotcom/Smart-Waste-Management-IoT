@@ -1,3 +1,7 @@
+AUTHORS: 1) AARYAN
+         2) ADEEP NEKLAJE
+         3) ADITHYA UMESH SALIAN
+
 # Smart Waste Management – IoT
 
 This repository contains the complete hardware, software, and documentation for an IoT‑enabled Smart Waste Management System built using Raspberry Pi Pico/Pico W.
@@ -46,4 +50,5 @@ This repository contains the complete hardware, software, and documentation for 
 A demo video guide is provided in `demo_video.md`. Record your circuit, OLED output, ThingSpeak dashboard, and Telegram alert.
 
 ## 📄 License
+
 This project is released under the **MIT License**.
